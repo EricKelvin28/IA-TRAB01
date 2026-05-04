@@ -1,9 +1,9 @@
 % =========================================
-% PLANEJADOR
+% PLANEJADOR FINAL 
 % =========================================
 
 % -------------------------
-% BLOCOS (tamanho)
+% BLOCOS
 % -------------------------
 bloco(a,1).
 bloco(b,1).
@@ -13,10 +13,8 @@ bloco(d,3).
 limite(0,6).
 
 % -------------------------
-% ESTADOS (EXEMPLOS)
-% b(Nome, Inicio, Fim, Altura)
+% ESTADOS (NÃO ALTERADOS)
 % -------------------------
-
 estado(s0, [
     b(c,0,1,0),
     b(a,3,3,0),
@@ -31,60 +29,22 @@ estado(sf1, [
     b(c,4,5,2)
 ]).
 
-estado(sf2, [
-    b(d,3,5,0),
-    b(a,4,4,2),
-    b(b,5,5,2),
-    b(c,4,5,1)
-]).
-
-estado(sf3, [
-    b(d,0,2,1),
-    b(a,2,2,0),
-    b(b,5,5,0),
-    b(c,0,1,0)
-]).
-
-estado(sf4, [
-    b(d,2,4,0),
-    b(a,0,0,1),
-    b(b,5,5,0),
-    b(c,0,1,0)
-]).
-
-estado(s20, [
-    b(a,0,0,1),
-    b(b,1,1,1),
-    b(c,0,1,0),
-    b(d,3,5,0)
-]).
-
-estado(s5, [
-    b(a,4,4,2),
-    b(b,5,5,2),
-    b(c,4,5,1),
-    b(d,3,5,0)
-]).
-
-estado(s30, [
-    b(a,3,3,0),
-    b(b,5,5,0),
-    b(c,0,1,0),
-    b(d,3,5,1)
-]).
-estado(s7, [
-    b(a,0,0,1),
-    b(b,1,1,1),
-    b(c,0,1,0),
-    b(d,3,5,0)
-]).
-
 % -------------------------
 % SOBREPOSIÇÃO
 % -------------------------
 sobrepoe(I1,F1,I2,F2) :-
     I1 =< F2,
     I2 =< F1.
+
+% -------------------------
+% OCUPAÇÃO
+% -------------------------
+ocupado(I,F,H,Estado) :-
+    member(b(_,I2,F2,H), Estado),
+    sobrepoe(I,F,I2,F2).
+
+espaco_livre(I,F,H,Estado) :-
+    \+ ocupado(I,F,H,Estado).
 
 % -------------------------
 % TOPO LIVRE
@@ -97,7 +57,7 @@ topo_livre(b(_,I,F,H), Estado) :-
     ).
 
 % -------------------------
-% SUPORTE
+% SUPORTE (MODELO PDF)
 % -------------------------
 tem_suporte(_,_,0,_).
 
@@ -108,16 +68,7 @@ tem_suporte(I,F,H,Estado) :-
     sobrepoe(I,F,I2,F2).
 
 % -------------------------
-% LIVRE
-% -------------------------
-livre_intervalo(I,F,H,Estado) :-
-    \+ (
-        member(b(_,I2,F2,H), Estado),
-        sobrepoe(I,F,I2,F2)
-    ).
-
-% -------------------------
-% UTILITÁRIOS
+% UTIL
 % -------------------------
 pega_bloco(N, [b(N,I,F,H)|_], b(N,I,F,H)).
 pega_bloco(N, [_|T], B) :- pega_bloco(N,T,B).
@@ -126,11 +77,11 @@ remove_bloco(N, [b(N,_,_,_)|T], T).
 remove_bloco(N, [H|T], [H|R]) :- remove_bloco(N,T,R).
 
 % -------------------------
-% ALTURA (com limite)
+% ALTURA
 % -------------------------
 altura_valida(I,F,H,Estado,H) :-
     H =< 5,
-    livre_intervalo(I,F,H,Estado),
+    espaco_livre(I,F,H,Estado),
     tem_suporte(I,F,H,Estado), !.
 
 altura_valida(I,F,H,Estado,Hfinal) :-
@@ -139,16 +90,17 @@ altura_valida(I,F,H,Estado,Hfinal) :-
     altura_valida(I,F,H1,Estado,Hfinal).
 
 % -------------------------
-% POSIÇÃO VÁLIDA
+% POSIÇÕES (REDUZIDAS)
 % -------------------------
 pos_valida(N, Pos) :-
     bloco(N,Tam),
     limite(Min,Max),
     MaxPos is Max - Tam + 1,
-    between(Min, MaxPos, Pos).
+    between(Min, MaxPos, Pos),
+    member(Pos, [0,2,3,4,5]).  % reduz busca
 
 % -------------------------
-% AÇÃO MOVE
+% MOVER
 % -------------------------
 mover(N, NovoInicio, Estado, NovoEstado) :-
 
@@ -165,7 +117,7 @@ mover(N, NovoInicio, Estado, NovoEstado) :-
 
     altura_valida(NovoInicio, NovoFim, 0, Estado, NovaAltura),
 
-    livre_intervalo(NovoInicio, NovoFim, NovaAltura, Estado),
+    espaco_livre(NovoInicio, NovoFim, NovaAltura, Estado),
 
     tem_suporte(NovoInicio, NovoFim, NovaAltura, Estado),
 
@@ -188,14 +140,14 @@ igual_estado([b(N,I,F,H)|T], Estado) :-
 % -------------------------
 % RESOLVER
 % -------------------------
-resolver(IniNome, GoalNome, Plano) :-
-    estado(IniNome, Ini),
-    estado(GoalNome, Goal),
+resolver(Plano) :-
+    estado(s0, Ini),
+    estado(sf1, Goal),
     normaliza(Ini, IniN),
-    busca(IniN, Goal, [IniN], Plano, 0, 15).
+    busca(IniN, Goal, [IniN], Plano, 0, 8).
 
 % -------------------------
-% BUSCA (DFS CONTROLADO)
+% BUSCA CONTROLADA
 % -------------------------
 busca(Estado, Goal, _, [], _, _) :-
     igual_estado(Goal, Estado).
@@ -203,7 +155,8 @@ busca(Estado, Goal, _, [], _, _) :-
 busca(EstadoAtual, Goal, Visitados, [move(N,Pi,Pj)|Plano], Prof, Limite) :-
     Prof < Limite,
 
-    member(b(N,Pi,_,_), EstadoAtual),
+    member(b(N,Pi,F,H), EstadoAtual),
+	topo_livre(b(N,Pi,F,H), EstadoAtual),
 
     pos_valida(N, Pj),
     Pj =\= Pi,
@@ -216,4 +169,5 @@ busca(EstadoAtual, Goal, Visitados, [move(N,Pi,Pj)|Plano], Prof, Limite) :-
 
     Prof1 is Prof + 1,
 
+    busca(NovoN, Goal, [NovoN|Visitados], Plano, Prof1, Limite).
     busca(NovoN, Goal, [NovoN|Visitados], Plano, Prof1, Limite).
